@@ -15,9 +15,9 @@ fn compute_color(z0: Complex<f64>, max_iter: u32) -> Rgb<u8> {
     let color = if i == max_iter {
         Rgb([0, 0, 0])
     } else {
-        let r = (i as f64 / max_iter as f64).powf(0.954);
+        let r = (i as f64 / max_iter as f64).powf(0.9);
         let g = (i as f64 / max_iter as f64).powf(0.2);
-        let b = 1.0 - (i as f64 / max_iter as f64).powf(0.3);
+        let b = 1.0 - (i as f64 / max_iter as f64).powf(0.4);
         Rgb([(r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8])
     };
     color
@@ -29,7 +29,6 @@ fn draw_fractal(
     max_iter: u32,
     scale: f64,
     zoom_level: f64,
-    pan_position: (f64, f64),
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
     let mut imgbuf = ImageBuffer::new(width, height);
     let (w, h) = (width as f64, height as f64);
@@ -37,9 +36,6 @@ fn draw_fractal(
         (width as f64 / zoom_level) as u32,
         (height as f64 / zoom_level) as u32,
     );
-    let (pan_x, pan_y) = pan_position;
-    let (view_w, view_h) = (capture_w as f64 / w * scale, capture_h as f64 / h * scale);
-    let (view_x, view_y) = (pan_x - view_w, pan_y - view_h);
 
     type J = Option<JoinHandle<Rgb<u8>>>;
 
@@ -48,8 +44,8 @@ fn draw_fractal(
     for x in 0..width as usize {
         thread_matrix.push(Vec::new());
         for y in 0..height as usize {
-            let cx = (x as f64 - 0.5 * capture_w as f64) * scale / w + view_x;
-            let cy = (y as f64 - 0.5 * capture_h as f64) * scale / h + view_y;
+            let cx = (x as f64 - 0.5 * capture_w as f64) * scale / w;
+            let cy = (y as f64 - 0.5 * capture_h as f64) * scale / h;
             let z = Complex::new(cx, cy);
             let handle = Some(thread::spawn(move || compute_color(z, max_iter)));
             thread_matrix[x].push(handle);
@@ -91,14 +87,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
 
     let max_iter = args[4].parse::<u32>().unwrap();
-    let scale = args[4].parse::<f64>().unwrap();
+    let scale = args[5].parse::<f64>().unwrap();
     let imgbuf = draw_fractal(
         capture_width,
         capture_height,
         max_iter,
         scale,
-        3.0,
-        (0.0, 0.0),
+        1.0
     );
     let resized = image::imageops::resize(
         &imgbuf,
