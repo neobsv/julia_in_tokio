@@ -46,7 +46,7 @@ fn draw_fractal(
         for y in 0..height as usize {
             let cx = (x as f64 - 0.5 * capture_w as f64) * scale / w;
             let cy = (y as f64 - 0.5 * capture_h as f64) * scale / h;
-            let c = Complex::new(0.0, 0.5);
+            let c = Complex::new(0.3, 0.5);
             let z  = Complex::new(cx, cy);
             let handle = Some(thread::spawn(move || compute_color(z, c,  max_iter)));
             thread_matrix[x].push(handle);
