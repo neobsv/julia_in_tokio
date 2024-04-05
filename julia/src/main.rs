@@ -41,15 +41,18 @@ fn draw_fractal(
     let (view_w, view_h) = (capture_w as f64 / w * scale, capture_h as f64 / h * scale);
     let (view_x, view_y) = (pan_x - view_w / 2.0, pan_y - view_h / 2.0);
 
-    let mut thread_matrix: Vec<Vec<Option<JoinHandle<Rgb<u8>>>>> = Vec::new();
+    type J = Option<JoinHandle<Rgb<u8>>>;
+
+    let mut thread_matrix: Vec<Vec<J>> = Vec::new();
 
     for x in 0..width as usize {
+        thread_matrix.push(Vec::new());
         for y in 0..height as usize {
             let cx = (x as f64 - 0.5 * capture_w as f64) * scale / w + view_x;
             let cy = (y as f64 - 0.5 * capture_h as f64) * scale / h + view_y;
             let z = Complex::new(cx, cy);
             let handle = Some(thread::spawn(move || compute_color(z, max_iter)));
-            thread_matrix[x][y] = handle;
+            thread_matrix[x].push(handle);
         }
     }
 
@@ -94,8 +97,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         capture_height,
         max_iter,
         scale,
-        0.99,
-        (1.0, 1.0),
+        0.1,
+        (0.0, 0.0),
     );
     let resized = image::imageops::resize(
         &imgbuf,
