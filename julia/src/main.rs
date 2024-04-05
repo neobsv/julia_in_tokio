@@ -5,22 +5,24 @@ use tokio::task::JoinHandle;
 use std::env;
 use std::fs::File;
 
-
-async fn compute_color(z0: Complex<f64>, c: Complex<f64>, max_iter: u32) -> Rgb<u8> {
+async fn compute_color(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> Rgb<u8> {
     let mut z = z0;
     let mut i = 0;
-    while z.norm() <= 2.0 && i < max_iter {
+    while z.norm() <= 2.0 && i < iterations {
         z = z * z + c;
         i += 1;
     }
-    let color = if i == max_iter {
-        Rgb([0, 0, 0])
-    } else {
-        let r = (i as f64 / max_iter as f64).powf(0.9);
-        let g = (i as f64 / max_iter as f64).powf(0.2);
-        let b = 1.0 - (i as f64 / max_iter as f64).powf(0.4);
-        Rgb([(r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8])
+    
+    let color = match i == iterations {
+        true => Rgb([0, 0, 0]),
+        false => {
+            let r = (i as f64 / iterations as f64).powf(0.9);
+            let g = (i as f64 / iterations as f64).powf(0.2);
+            let b = 1.0 - (i as f64 / iterations as f64).powf(0.4);
+            Rgb([(r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8])
+        }
     };
+    
     color
 }
 
@@ -28,15 +30,15 @@ async fn compute_color(z0: Complex<f64>, c: Complex<f64>, max_iter: u32) -> Rgb<
 async fn draw_fractal(
     width: u32,
     height: u32,
-    max_iter: u32,
+    iterations: u32,
     scale: f64,
-    zoom_level: f64,
+    zoom: f64,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-    let mut imgbuf = ImageBuffer::new(width, height);
+    let mut image_buffer = ImageBuffer::new(width, height);
     let (w, h) = (width as f64, height as f64);
     let (capture_w, capture_h) = (
-        (width as f64 / zoom_level) as u32,
-        (height as f64 / zoom_level) as u32,
+        (width as f64 / zoom) as u32,
+        (height as f64 / zoom) as u32,
     );
 
 
@@ -49,7 +51,7 @@ async fn draw_fractal(
             let cy = (y as f64 - 0.5 * capture_h as f64) * scale / h;
             let c = Complex::new(0.353343, 0.5133225);
             let z  = Complex::new(cx, cy);
-            let handle = Some( tokio::spawn(async move { compute_color(z, c,  max_iter) }) );
+            let handle = Some( tokio::spawn(async move { compute_color(z, c,  iterations) }) );
             thread_matrix[x].push(handle);
         }
     }
@@ -58,11 +60,11 @@ async fn draw_fractal(
         for y in 0..height as usize {
             let color: JoinHandle<_> = thread_matrix[x][y].take().unwrap();
             let res_color: Rgb<u8> = color.await.unwrap().await;
-            imgbuf.put_pixel(x as u32, y as u32, res_color);
+            image_buffer.put_pixel(x as u32, y as u32, res_color);
         }
     }
 
-    imgbuf
+    image_buffer
 }
 
 
@@ -89,17 +91,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .next_tuple()
         .unwrap();
 
-    let max_iter = args[4].parse::<u32>().unwrap();
+    let iterations = args[4].parse::<u32>().unwrap();
     let scale = args[5].parse::<f64>().unwrap();
-    let imgbuf = draw_fractal(
+    let image_buffer = draw_fractal(
         capture_width,
         capture_height,
-        max_iter,
+        iterations,
         scale,
         1.0
     );
     let resized = image::imageops::resize(
-        &imgbuf,
+        &image_buffer,
         width,
         height,
         image::imageops::FilterType::Lanczos3,

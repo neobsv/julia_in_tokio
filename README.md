@@ -1,10 +1,16 @@
-## Julia in Tokio
+# Julia in Tokio
 
 Run:
 
 cd julia/
-cargo run --release -- julia.png 200x200 200x200 15 3.5
+cargo run --release -- julia.png 3840x2160 3840x2160 150 3.5
 open julia.png
+
+other:
+cargo run --release -- julia.png 1024x768 1024x768 300 3.5
+
+zoomed:
+cargo run --release -- julia.png 1024x768 1024x768 300 1.5
 
 ### Introduction
 
