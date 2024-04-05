@@ -3,7 +3,7 @@
 Run:
 
 cd julia/
-cargo run --release -- julia.png 100x100 100x100 15 3.5
+cargo run --release -- julia.png 200x200 200x200 15 3
 open julia.png
 
 ### Introduction

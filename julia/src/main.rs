@@ -5,11 +5,11 @@ use std::env;
 use std::fs::File;
 use std::{thread, thread::JoinHandle};
 
-fn compute_color(z0: Complex<f64>, max_iter: u32) -> Rgb<u8> {
+fn compute_color(z0: Complex<f64>, c: Complex<f64>, max_iter: u32) -> Rgb<u8> {
     let mut z = z0;
     let mut i = 0;
     while z.norm() <= 2.0 && i < max_iter {
-        z = z * z + z;
+        z = z * z + c;
         i += 1;
     }
     let color = if i == max_iter {
@@ -46,8 +46,9 @@ fn draw_fractal(
         for y in 0..height as usize {
             let cx = (x as f64 - 0.5 * capture_w as f64) * scale / w;
             let cy = (y as f64 - 0.5 * capture_h as f64) * scale / h;
-            let z = Complex::new(cx, cy);
-            let handle = Some(thread::spawn(move || compute_color(z, max_iter)));
+            let c = Complex::new(0.0, 0.5);
+            let z  = Complex::new(cx, cy);
+            let handle = Some(thread::spawn(move || compute_color(z, c,  max_iter)));
             thread_matrix[x].push(handle);
         }
     }
