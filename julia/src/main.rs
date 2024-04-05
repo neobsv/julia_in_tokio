@@ -1,11 +1,12 @@
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
+use tokio::task::JoinHandle;
 use std::env;
 use std::fs::File;
-use std::{thread, thread::JoinHandle};
 
-fn compute_color(z0: Complex<f64>, c: Complex<f64>, max_iter: u32) -> Rgb<u8> {
+
+async fn compute_color(z0: Complex<f64>, c: Complex<f64>, max_iter: u32) -> Rgb<u8> {
     let mut z = z0;
     let mut i = 0;
     while z.norm() <= 2.0 && i < max_iter {
@@ -23,7 +24,8 @@ fn compute_color(z0: Complex<f64>, c: Complex<f64>, max_iter: u32) -> Rgb<u8> {
     color
 }
 
-fn draw_fractal(
+#[tokio::main]
+async fn draw_fractal(
     width: u32,
     height: u32,
     max_iter: u32,
@@ -37,9 +39,8 @@ fn draw_fractal(
         (height as f64 / zoom_level) as u32,
     );
 
-    type J = Option<JoinHandle<Rgb<u8>>>;
 
-    let mut thread_matrix: Vec<Vec<J>> = Vec::new();
+    let mut thread_matrix: Vec<Vec<Option<JoinHandle<_>>>> = Vec::new();
 
     for x in 0..width as usize {
         thread_matrix.push(Vec::new());
@@ -48,21 +49,22 @@ fn draw_fractal(
             let cy = (y as f64 - 0.5 * capture_h as f64) * scale / h;
             let c = Complex::new(0.353343, 0.5133225);
             let z  = Complex::new(cx, cy);
-            let handle = Some(thread::spawn(move || compute_color(z, c,  max_iter)));
+            let handle = Some( tokio::spawn(async move { compute_color(z, c,  max_iter) }) );
             thread_matrix[x].push(handle);
         }
     }
 
     for x in 0..width as usize {
         for y in 0..height as usize {
-            let color: JoinHandle<Rgb<u8>> = thread_matrix[x][y].take().unwrap();
-            let res_color: Rgb<u8> = color.join().unwrap();
+            let color: JoinHandle<_> = thread_matrix[x][y].take().unwrap();
+            let res_color: Rgb<u8> = color.await.unwrap().await;
             imgbuf.put_pixel(x as u32, y as u32, res_color);
         }
     }
 
     imgbuf
 }
+
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
