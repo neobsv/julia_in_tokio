@@ -1,33 +1,34 @@
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
-use tokio::task::JoinHandle;
 use std::env;
 use std::fs::File;
+use tokio::task::JoinHandle;
 
-async fn compute_color(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> Rgb<u8> {
+async fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> Rgb<u8> {
     let mut z = z0;
-    let mut i = 0;
-    while z.norm() <= 2.0 && i < iterations {
+    let mut current = 0;
+
+    while z.norm() <= 2.0 && current < iterations {
         z = z * z + c;
-        i += 1;
+        current += 1;
     }
-    
-    let color = match i == iterations {
+
+    let color = match current == iterations {
         true => Rgb([0, 0, 0]),
         false => {
-            let r = (i as f64 / iterations as f64).powf(0.9);
-            let g = (i as f64 / iterations as f64).powf(0.2);
-            let b = 1.0 - (i as f64 / iterations as f64).powf(0.4);
+            let r = (current as f64 / iterations as f64).powf(0.9);
+            let g = (current as f64 / iterations as f64).powf(0.2);
+            let b = 1.0 - (current as f64 / iterations as f64).powf(0.4);
             Rgb([(r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8])
         }
     };
-    
+
     color
 }
 
 #[tokio::main]
-async fn draw_fractal(
+async fn generate_image_buffer(
     width: u32,
     height: u32,
     iterations: u32,
@@ -35,23 +36,25 @@ async fn draw_fractal(
     zoom: f64,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
     let mut image_buffer = ImageBuffer::new(width, height);
+
     let (w, h) = (width as f64, height as f64);
     let (capture_w, capture_h) = (
-        (width as f64 / zoom) as u32,
-        (height as f64 / zoom) as u32,
+        (width as f64 / zoom) as u32, 
+        (height as f64 / zoom) as u32
     );
-
 
     let mut thread_matrix: Vec<Vec<Option<JoinHandle<_>>>> = Vec::new();
 
     for x in 0..width as usize {
         thread_matrix.push(Vec::new());
         for y in 0..height as usize {
+            let c = Complex::new(0.353343, 0.5133225);
             let cx = (x as f64 - 0.5 * capture_w as f64) * scale / w;
             let cy = (y as f64 - 0.5 * capture_h as f64) * scale / h;
-            let c = Complex::new(0.353343, 0.5133225);
-            let z  = Complex::new(cx, cy);
-            let handle = Some( tokio::spawn(async move { compute_color(z, c,  iterations) }) );
+            let z = Complex::new(cx, cy);
+            let handle = Some(tokio::spawn(
+                async move { color_generator(z, c, iterations) },
+            ));
             thread_matrix[x].push(handle);
         }
     }
@@ -67,13 +70,14 @@ async fn draw_fractal(
     image_buffer
 }
 
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
+
     if args.len() != 6 {
-        println!("Usage: {} <output_file> <width>x<height> <capture_width>x<capture_height> <max_iter> <scale>", args[0]);
+        println!("Refer to the README doc for usage details!");
         return Ok(());
     }
+
     let output_file = &args[1];
     let (width, height) = args[2]
         .split('x')
@@ -93,13 +97,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let iterations = args[4].parse::<u32>().unwrap();
     let scale = args[5].parse::<f64>().unwrap();
-    let image_buffer = draw_fractal(
-        capture_width,
-        capture_height,
-        iterations,
-        scale,
-        1.0
-    );
+    let image_buffer = generate_image_buffer(capture_width, capture_height, iterations, scale, 1.0);
     let resized = image::imageops::resize(
         &image_buffer,
         width,
