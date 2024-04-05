@@ -15,9 +15,9 @@ fn compute_color(z0: Complex<f64>, max_iter: u32) -> Rgb<u8> {
     let color = if i == max_iter {
         Rgb([0, 0, 0])
     } else {
-        let r = (i as f64 / max_iter as f64).powf(0.3);
-        let g = (i as f64 / max_iter as f64).powf(0.5);
-        let b = 1.0 - (i as f64 / max_iter as f64).powf(0.7);
+        let r = (i as f64 / max_iter as f64).powf(0.954);
+        let g = (i as f64 / max_iter as f64).powf(0.2);
+        let b = 1.0 - (i as f64 / max_iter as f64).powf(0.3);
         Rgb([(r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8])
     };
     color
@@ -39,7 +39,7 @@ fn draw_fractal(
     );
     let (pan_x, pan_y) = pan_position;
     let (view_w, view_h) = (capture_w as f64 / w * scale, capture_h as f64 / h * scale);
-    let (view_x, view_y) = (pan_x - view_w / 2.0, pan_y - view_h / 2.0);
+    let (view_x, view_y) = (pan_x - view_w, pan_y - view_h);
 
     type J = Option<JoinHandle<Rgb<u8>>>;
 
@@ -97,7 +97,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         capture_height,
         max_iter,
         scale,
-        0.1,
+        3.0,
         (0.0, 0.0),
     );
     let resized = image::imageops::resize(

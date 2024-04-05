@@ -1,5 +1,11 @@
 ## Julia in Tokio
 
+Run:
+
+cd julia/
+cargo run --release -- julia.png 200x200 200x200 10 100
+open julia.png
+
 ### Introduction
 
 The complex equation for it is:
