@@ -3,14 +3,14 @@
 Run:
 
 cd julia/
-cargo run --release -- julia.png 3840x2160 3840x2160 150 3.5
+cargo run --release -- 3840x2160 3840x2160 150 3.5
 open julia.png
 
 other:
-cargo run --release -- julia.png 1024x768 1024x768 300 3.5
+cargo run --release -- 1024x768 1024x768 300 3.5
 
 zoomed:
-cargo run --release -- julia.png 1024x768 1024x768 300 1.5
+cargo run --release -- 1024x768 1024x768 300 1.5
 
 ### Introduction
 
