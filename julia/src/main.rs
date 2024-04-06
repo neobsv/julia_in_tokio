@@ -1,10 +1,10 @@
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
-use std::env;
-use tokio::task::JoinHandle;
+use std::{env, {thread, thread::JoinHandle}};
 
-async fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> Rgb<u8> {
+
+fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> Rgb<u8> {
     let mut z = z0;
     let mut current = 0;
 
@@ -28,8 +28,7 @@ async fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> 
     color
 }
 
-#[tokio::main]
-async fn generate_image_buffer(
+fn generate_image_buffer(
     width: u32,
     height: u32,
     iterations: u32,
@@ -50,8 +49,8 @@ async fn generate_image_buffer(
             let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
             let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
             let z = Complex::new(cx, cy);
-            let handle = Some(tokio::spawn(
-                async move { color_generator(z, c, iterations) },
+            let handle = Some(thread::spawn(
+                move || { color_generator(z, c, iterations) },
             ));
             thread_matrix[x].push(handle);
         }
@@ -60,7 +59,7 @@ async fn generate_image_buffer(
     for x in 0..width as usize {
         for y in 0..height as usize {
             let color: JoinHandle<_> = thread_matrix[x][y].take().unwrap();
-            let res_color: Rgb<u8> = color.await.unwrap().await;
+            let res_color: Rgb<u8> = color.join().unwrap();
             image_buffer.put_pixel(x as u32, y as u32, res_color);
         }
     }
