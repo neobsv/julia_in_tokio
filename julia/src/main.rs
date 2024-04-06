@@ -40,15 +40,15 @@ async fn generate_image_buffer(
 
     let c = Complex::new(0.353343, 0.5133225);
     let (w, h) = (width as f64, height as f64);
-    let (capture_w, capture_h) = ((width as f64 / zoom) as u32, (height as f64 / zoom) as u32);
+    let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
     let mut thread_matrix: Vec<Vec<Option<JoinHandle<_>>>> = Vec::new();
 
     for x in 0..width as usize {
         thread_matrix.push(Vec::new());
         for y in 0..height as usize {
-            let cx = (x as f64 - 0.5 * capture_w as f64) * scale / w;
-            let cy = (y as f64 - 0.5 * capture_h as f64) * scale / h;
+            let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
+            let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
             let z = Complex::new(cx, cy);
             let handle = Some(tokio::spawn(
                 async move { color_generator(z, c, iterations) },
