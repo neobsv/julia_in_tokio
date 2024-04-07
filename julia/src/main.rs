@@ -1,8 +1,8 @@
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
-use std::env;
 use rayon::prelude::*;
+use std::env;
 
 fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> Rgb<u8> {
     let mut z = z0;
@@ -41,14 +41,17 @@ fn generate_image_buffer(
     let (w, h) = (width as f64, height as f64);
     let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
-    let _ = image_buffer.enumerate_pixels_mut().par_bridge().for_each(|(x, y, pixel)| {
-        let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
-        let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
-        let z = Complex::new(cx, cy);
-        let color = color_generator(z, c, iterations);
-        *pixel = color;
-    });
-    
+    let _ = image_buffer
+        .enumerate_pixels_mut()
+        .par_bridge()
+        .for_each(|(x, y, pixel)| {
+            let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
+            let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
+            let z = Complex::new(cx, cy);
+            let color = color_generator(z, c, iterations);
+            *pixel = color;
+        });
+
     image_buffer
 }
 
