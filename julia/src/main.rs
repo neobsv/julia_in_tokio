@@ -1,7 +1,7 @@
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
-use tokio::task::JoinHandle;
+use tokio::task::{JoinHandle};
 use std::{env, sync::{Arc, Mutex}};
 
 async fn color_generator(
@@ -34,6 +34,8 @@ async fn color_generator(
 
     let mut matrix = color_matrix.lock().unwrap();
     matrix[x][y] = color;
+    // println!("Thread Color: {:#?}", matrix[x][y]);
+
 }
 
 #[tokio::main]
@@ -61,20 +63,22 @@ async fn generate_image_buffer(
             let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
             let z = Complex::new(cx, cy);
             let color_matrix = Arc::clone(&color_matrix);
-            let handle = tokio::spawn(
-                async move { color_generator(z, c, iterations, x, y, color_matrix) },
-            );
-            thread_vec.push(handle);
+            thread_vec.push(tokio::spawn(async move { 
+                color_generator(z, c, iterations, x, y, color_matrix).await;
+            }));
         }
     }
 
-    let _ = futures::future::try_join_all(thread_vec).await;
+    for handle in thread_vec {
+        let _ = handle.await.unwrap();
+    }
 
     let mut image_buffer = ImageBuffer::new(width, height);
     let matrix = color_matrix.lock().unwrap();
 
     for x in 0..wusize {
         for y in 0..husize {
+            // println!("Color: {:#?}", matrix[x][y]);
             image_buffer.put_pixel(x as u32, y as u32, matrix[x][y]);
         }
     }
