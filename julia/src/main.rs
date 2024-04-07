@@ -37,7 +37,6 @@ async fn color_generator(
 
     let mut matrix = color_matrix.lock().unwrap();
     matrix[x][y] = color;
-    // println!("Thread Color: {:#?}", matrix[x][y]);
 }
 
 #[tokio::main]
@@ -56,7 +55,6 @@ async fn generate_image_buffer(
     let (w, h) = (width as f64, height as f64);
     let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
-    // let mut thread_vec: Vec<JoinHandle<_>> = Vec::new();
     let mut join_set = JoinSet::new();
 
     for x in 0..width as usize {
@@ -78,7 +76,6 @@ async fn generate_image_buffer(
 
     for x in 0..wusize {
         for y in 0..husize {
-            // println!("Color: {:#?}", matrix[x][y]);
             image_buffer.put_pixel(x as u32, y as u32, matrix[x][y]);
         }
     }
