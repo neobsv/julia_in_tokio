@@ -1,10 +1,19 @@
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
-use std::env;
-use tokio::task::JoinHandle;
+use std::{
+    env,
+    sync::{Arc, Mutex},
+};
 
-async fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> Rgb<u8> {
+fn color_generator(
+    z0: Complex<f64>,
+    c: Complex<f64>,
+    iterations: u32,
+    x: usize,
+    y: usize,
+    color_matrix: Arc<Mutex<Vec<Vec<Rgb<u8>>>>>,
+) -> () {
     let mut z = z0;
     let mut current = 0;
 
@@ -25,43 +34,45 @@ async fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> 
         ]),
     };
 
-    color
+    let mut matrix = color_matrix.lock().unwrap();
+    matrix[x][y] = color;
 }
 
-#[tokio::main]
-async fn generate_image_buffer(
+fn generate_image_buffer(
     width: u32,
     height: u32,
     iterations: u32,
     scale: f64,
     zoom: f64,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-    let mut image_buffer = ImageBuffer::new(width, height);
+    let wusize = width as usize;
+    let husize = height as usize;
+
+    let color_matrix = Arc::new(Mutex::new(vec![vec![Rgb([0, 0, 0]); wusize]; husize]));
 
     let c = Complex::new(0.353343, 0.5133225);
     let (w, h) = (width as f64, height as f64);
     let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
-    let mut thread_matrix: Vec<Vec<Option<JoinHandle<_>>>> = Vec::new();
-
-    for x in 0..width as usize {
-        thread_matrix.push(Vec::new());
-        for y in 0..height as usize {
-            let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
-            let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
-            let z = Complex::new(cx, cy);
-            let handle = Some(tokio::spawn(
-                async move { color_generator(z, c, iterations) },
-            ));
-            thread_matrix[x].push(handle);
+    let _ = crossbeam::scope(|tspawn| {
+        for x in 0..wusize {
+            for y in 0..husize {
+                let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
+                let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
+                let z = Complex::new(cx, cy);
+                let color_matrix = Arc::clone(&color_matrix);
+                tspawn.spawn(move |_| color_generator(z, c, iterations, x, y, color_matrix));
+            }
         }
-    }
+    })
+    .unwrap();
 
-    for x in 0..width as usize {
-        for y in 0..height as usize {
-            let color: JoinHandle<_> = thread_matrix[x][y].take().unwrap();
-            let res_color: Rgb<u8> = color.await.unwrap().await;
-            image_buffer.put_pixel(x as u32, y as u32, res_color);
+    let mut image_buffer = ImageBuffer::new(width, height);
+    let matrix = color_matrix.lock().unwrap();
+
+    for x in 0..wusize {
+        for y in 0..husize {
+            image_buffer.put_pixel(x as u32, y as u32, matrix[x][y]);
         }
     }
 
@@ -94,6 +105,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let iterations = args[3].parse::<u32>().unwrap();
     let scale = args[4].parse::<f64>().unwrap();
+
     let image_buffer = generate_image_buffer(capture_width, capture_height, iterations, scale, 1.0);
 
     let image: image::RgbImage =
