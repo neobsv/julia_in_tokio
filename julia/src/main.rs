@@ -1,17 +1,20 @@
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
-use tokio::task::{JoinHandle};
-use std::{env, sync::{Arc, Mutex}};
+use std::{
+    env,
+    sync::{Arc, Mutex},
+};
+use tokio::task::JoinSet;
 
 async fn color_generator(
     z0: Complex<f64>,
-    c: Complex<f64>, 
+    c: Complex<f64>,
     iterations: u32,
     x: usize,
     y: usize,
-    color_matrix: Arc<Mutex<Vec<Vec<Rgb<u8>>>>>
- ) -> () {
+    color_matrix: Arc<Mutex<Vec<Vec<Rgb<u8>>>>>,
+) -> () {
     let mut z = z0;
     let mut current = 0;
 
@@ -35,7 +38,6 @@ async fn color_generator(
     let mut matrix = color_matrix.lock().unwrap();
     matrix[x][y] = color;
     // println!("Thread Color: {:#?}", matrix[x][y]);
-
 }
 
 #[tokio::main]
@@ -46,7 +48,6 @@ async fn generate_image_buffer(
     scale: f64,
     zoom: f64,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-    
     let wusize = width as usize;
     let husize = height as usize;
     let color_matrix = Arc::new(Mutex::new(vec![vec![Rgb([0, 0, 0]); wusize]; husize]));
@@ -55,7 +56,8 @@ async fn generate_image_buffer(
     let (w, h) = (width as f64, height as f64);
     let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
-    let mut thread_vec: Vec<JoinHandle<_>> = Vec::new();
+    // let mut thread_vec: Vec<JoinHandle<_>> = Vec::new();
+    let mut join_set = JoinSet::new();
 
     for x in 0..width as usize {
         for y in 0..height as usize {
@@ -63,15 +65,13 @@ async fn generate_image_buffer(
             let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
             let z = Complex::new(cx, cy);
             let color_matrix = Arc::clone(&color_matrix);
-            thread_vec.push(tokio::spawn(async move { 
+            join_set.spawn(async move {
                 color_generator(z, c, iterations, x, y, color_matrix).await;
-            }));
+            });
         }
     }
 
-    for handle in thread_vec {
-        let _ = handle.await.unwrap();
-    }
+    while let Some(_) = join_set.join_next().await {}
 
     let mut image_buffer = ImageBuffer::new(width, height);
     let matrix = color_matrix.lock().unwrap();
