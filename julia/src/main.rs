@@ -1,3 +1,6 @@
+#![feature(test)]
+extern crate test;
+
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
@@ -6,6 +9,7 @@ use std::{
     sync::{Arc, Mutex},
     thread::{self, JoinHandle},
 };
+
 
 fn color_generator(
     z0: Complex<f64>,
@@ -117,4 +121,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     image.save("julia.png").unwrap();
 
     Ok(())
+}
+
+fn add_two(a: i32) -> i32 {
+    a + 2
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    use test::Bencher;
+    use super::*;
+
+    #[test]
+    fn test_functional() {
+        let capture_width  = 200;
+        let capture_height  = 200;
+        let iterations = 300;
+        let scale = 3.5;
+        let image_buffer_test = generate_image_buffer(capture_width, capture_height, iterations, scale, 1.0);
+
+        assert!(!image_buffer_test.is_empty());
+        assert_eq!(image_buffer_test.dimensions().0, capture_height);
+        assert_eq!(image_buffer_test.dimensions().1, capture_width);
+    }
+
+    #[bench]
+    fn bench_add_two(b: &mut Bencher) {
+        b.iter(|| add_two(5));
+    }
+
 }
