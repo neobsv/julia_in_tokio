@@ -123,15 +123,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn add_two(a: i32) -> i32 {
-    a + 2
-}
-
 
 #[cfg(test)]
 mod tests {
 
     use test::Bencher;
+    use test::black_box;
     use super::*;
 
     #[test]
@@ -148,8 +145,14 @@ mod tests {
     }
 
     #[bench]
-    fn bench_add_two(b: &mut Bencher) {
-        b.iter(|| add_two(5));
+    fn bench_generate_image(b: &mut Bencher) {
+        b.iter(||{
+            let iterations = 300;
+            let scale = 3.5;
+            for (cw, ch) in vec![(10, 10), (20, 20), (30, 30)] {
+                let _ = black_box(generate_image_buffer(black_box(cw), black_box(ch), iterations, scale, 1.0));
+            }
+        });
     }
 
 }
