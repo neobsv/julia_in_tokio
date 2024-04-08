@@ -8,6 +8,7 @@ use std::{
     env,
     sync::{Arc, Mutex},
 };
+
 use tokio::task::JoinSet;
 
 async fn color_generator(
@@ -42,7 +43,7 @@ async fn color_generator(
     matrix[x][y] = color;
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn generate_image_buffer(
     width: u32,
     height: u32,
@@ -115,7 +116,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let image_buffer = generate_image_buffer(capture_width, capture_height, iterations, scale, 1.0);
 
     let image: image::RgbImage =
-        image::ImageBuffer::from_vec(width, height, image_buffer.to_vec()).unwrap();
+    image::ImageBuffer::from_vec(width, height, image_buffer.to_vec()).unwrap();
     image.save("julia.png").unwrap();
 
     Ok(())
