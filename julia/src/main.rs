@@ -48,24 +48,26 @@ fn generate_image_buffer(
     let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
     let pool = rayon::ThreadPoolBuilder::new()
-        .stack_size(2 * 1024 * 1024)
+        .stack_size(4 * 1024 * 1024)
         .num_threads(1)
         .build()
         .unwrap();
 
-    for x in 0..width as usize {
-        for y in 0..height as usize {
-            let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
-            let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
-            let z = Complex::new(cx, cy);
-            let color_matrix = Arc::clone(&color_matrix);
-            pool.spawn(move || { 
-                let color = color_generator(z, c, iterations);
-                let mut matrix = color_matrix.lock().unwrap();
-                matrix[x][y] = color;
-            }); 
+    pool.scope(|s| {
+        for x in 0..width as usize {
+            for y in 0..height as usize {
+                let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
+                let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
+                let z = Complex::new(cx, cy);
+                let color_matrix = Arc::clone(&color_matrix);
+                s.spawn(move |_| { 
+                    let color = color_generator(z, c, iterations);
+                    let mut matrix = color_matrix.lock().unwrap();
+                    matrix[x][y] = color;
+                }); 
+            }
         }
-    }
+    });
 
     let mut image_buffer = ImageBuffer::new(width, height);
     let matrix = color_matrix.lock().unwrap();
