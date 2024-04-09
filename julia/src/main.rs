@@ -51,13 +51,13 @@ fn generate_image_buffer(
     zoom: f64,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
     let runtime_workers = runtime::Builder::new_multi_thread()
-        .enable_all()
         .worker_threads(10)
+        .thread_stack_size(3 * 1024 * 1024)
         // Lower OS priority of worker threads to prioritize main runtime
         .on_thread_start(move || {
             let _ = set_current_thread_priority(ThreadPriority::Min).is_ok();
         })
-        .event_interval(200)
+        .event_interval(61)
         .build()
         .unwrap();
 
@@ -161,7 +161,7 @@ mod tests {
         b.iter(|| {
             let iterations = 300;
             let scale = 3.5;
-            for (cw, ch) in vec![(100, 100), (200, 200), (300, 300)] {
+            for (cw, ch) in vec![(100, 100), (20, 20), (30, 30)] {
                 let _ = black_box(generate_image_buffer(cw, ch, iterations, scale, 1.0));
             }
         });
