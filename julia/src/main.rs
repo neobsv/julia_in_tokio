@@ -51,7 +51,7 @@ fn generate_image_buffer(
 
     let pool = rayon::ThreadPoolBuilder::new()
         .stack_size(4 * 1024 * 1024)
-        .num_threads(1)
+        .num_threads(10)
         .build()
         .unwrap();
 
