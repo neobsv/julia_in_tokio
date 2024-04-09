@@ -5,7 +5,8 @@ use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
 use std::{
-    env, sync::{Arc, Mutex}
+    env,
+    sync::{Arc, Mutex},
 };
 use thread_priority::{set_current_thread_priority, ThreadPriority};
 use tokio::{runtime, task::JoinHandle};
@@ -49,21 +50,18 @@ fn generate_image_buffer(
     scale: f64,
     zoom: f64,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-
     let runtime_workers = runtime::Builder::new_multi_thread()
-    .enable_all()
-    .worker_threads(1)
-    // Lower OS priority of worker threads to prioritize main runtime
-    .on_thread_start(move || {
-        let _ = set_current_thread_priority(ThreadPriority::Min).is_ok();
-    })
-    .event_interval(200)
-    .build()
-    .unwrap();
-
+        .enable_all()
+        .worker_threads(10)
+        // Lower OS priority of worker threads to prioritize main runtime
+        .on_thread_start(move || {
+            let _ = set_current_thread_priority(ThreadPriority::Min).is_ok();
+        })
+        .event_interval(200)
+        .build()
+        .unwrap();
 
     let image_buffer = runtime_workers.block_on(async {
-
         let wusize = width as usize;
         let husize = height as usize;
         let color_matrix = Arc::new(Mutex::new(vec![vec![Rgb([0, 0, 0]); wusize]; husize]));
@@ -71,9 +69,6 @@ fn generate_image_buffer(
         let c = Complex::new(0.353343, 0.5133225);
         let (w, h) = (width as f64, height as f64);
         let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
-
-
-
 
         let mut tasks: Vec<JoinHandle<_>> = Vec::new();
 
@@ -91,8 +86,6 @@ fn generate_image_buffer(
 
         let _o = futures::future::join_all(tasks.into_iter());
 
-        // runtime_workers.shutdown_timeout(Duration::from_millis(100));
-
         let mut image_buffer = ImageBuffer::new(width, height);
         let matrix = color_matrix.lock().unwrap();
         for x in 0..wusize {
@@ -105,7 +98,6 @@ fn generate_image_buffer(
     });
 
     image_buffer
-    
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -143,7 +135,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -166,7 +157,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_tokio(b: &mut Bencher) {
+    fn bench_tokio_custom(b: &mut Bencher) {
         b.iter(|| {
             let iterations = 300;
             let scale = 3.5;
