@@ -13,10 +13,7 @@ fn color_generator(
     z0: Complex<f64>,
     c: Complex<f64>,
     iterations: u32,
-    x: usize,
-    y: usize,
-    color_matrix: Arc<Mutex<Vec<Vec<Rgb<u8>>>>>,
-) -> () {
+) -> Rgb<u8> {
     let mut z = z0;
     let mut current = 0;
 
@@ -37,8 +34,7 @@ fn color_generator(
         ]),
     };
 
-    let mut matrix = color_matrix.lock().unwrap();
-    matrix[x][y] = color;
+    color
 }
 
 fn generate_image_buffer(
@@ -64,7 +60,11 @@ fn generate_image_buffer(
                 let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
                 let z = Complex::new(cx, cy);
                 let color_matrix = Arc::clone(&color_matrix);
-                tspawn.spawn(move |_| color_generator(z, c, iterations, x, y, color_matrix));
+                tspawn.spawn(move |_| {
+                    let color = color_generator(z, c, iterations);
+                    let mut matrix = color_matrix.lock().unwrap();
+                    matrix[x][y] = color;
+                });
             }
         }
     })
