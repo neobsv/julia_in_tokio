@@ -4,7 +4,10 @@ extern crate test;
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
-use std::{env, sync::{Arc, Mutex}};
+use std::{
+    env,
+    sync::{Arc, Mutex},
+};
 
 fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> Rgb<u8> {
     let mut z = z0;
@@ -37,7 +40,6 @@ fn generate_image_buffer(
     scale: f64,
     zoom: f64,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-
     let wusize = width as usize;
     let husize = height as usize;
 
@@ -60,11 +62,11 @@ fn generate_image_buffer(
                 let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
                 let z = Complex::new(cx, cy);
                 let color_matrix = Arc::clone(&color_matrix);
-                s.spawn(move |_| { 
+                s.spawn(move |_| {
                     let color = color_generator(z, c, iterations);
                     let mut matrix = color_matrix.lock().unwrap();
                     matrix[x][y] = color;
-                }); 
+                });
             }
         }
     });
@@ -116,21 +118,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
 
-    use test::Bencher;
-    use test::black_box;
     use super::*;
+    use test::black_box;
+    use test::Bencher;
 
     #[test]
     fn test_functional() {
-        let capture_width  = 200;
-        let capture_height  = 200;
+        let capture_width = 200;
+        let capture_height = 200;
         let iterations = 300;
         let scale = 3.5;
-        let image_buffer_test = generate_image_buffer(capture_width, capture_height, iterations, scale, 1.0);
+        let image_buffer_test =
+            generate_image_buffer(capture_width, capture_height, iterations, scale, 1.0);
 
         assert!(!image_buffer_test.is_empty());
         assert_eq!(image_buffer_test.dimensions().0, capture_height);
@@ -139,7 +141,7 @@ mod tests {
 
     #[bench]
     fn bench_rayon_custom(b: &mut Bencher) {
-        b.iter(||{
+        b.iter(|| {
             let iterations = 300;
             let scale = 3.5;
             for (cw, ch) in vec![(1000, 1000)] {
@@ -147,5 +149,4 @@ mod tests {
             }
         });
     }
-
 }
