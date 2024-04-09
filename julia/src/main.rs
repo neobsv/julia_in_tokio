@@ -8,8 +8,8 @@ use std::{
     env,
     sync::{Arc, Mutex},
 };
-
-use tokio::task::JoinSet;
+use thread_priority::{set_current_thread_priority, ThreadPriority};
+use tokio::runtime;
 
 async fn color_generator(
     z0: Complex<f64>,
@@ -43,8 +43,7 @@ async fn color_generator(
     matrix[x][y] = color;
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn generate_image_buffer(
+fn generate_image_buffer(
     width: u32,
     height: u32,
     iterations: u32,
@@ -59,7 +58,16 @@ async fn generate_image_buffer(
     let (w, h) = (width as f64, height as f64);
     let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
-    let mut join_set = JoinSet::new();
+    let runtime = runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(1)
+        // Lower OS priority of worker threads to prioritize main runtime
+        .on_thread_start(move || {
+            let _ = set_current_thread_priority(ThreadPriority::Min).is_ok();
+        })
+        .event_interval(200)
+        .build()
+        .unwrap();
 
     for x in 0..width as usize {
         for y in 0..height as usize {
@@ -67,13 +75,11 @@ async fn generate_image_buffer(
             let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
             let z = Complex::new(cx, cy);
             let color_matrix = Arc::clone(&color_matrix);
-            join_set.spawn(async move {
+            runtime.spawn(async move {
                 color_generator(z, c, iterations, x, y, color_matrix).await;
             });
         }
     }
-
-    while let Some(_) = join_set.join_next().await {}
 
     let mut image_buffer = ImageBuffer::new(width, height);
     let matrix = color_matrix.lock().unwrap();
@@ -116,27 +122,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let image_buffer = generate_image_buffer(capture_width, capture_height, iterations, scale, 1.0);
 
     let image: image::RgbImage =
-    image::ImageBuffer::from_vec(width, height, image_buffer.to_vec()).unwrap();
+        image::ImageBuffer::from_vec(width, height, image_buffer.to_vec()).unwrap();
     image.save("julia.png").unwrap();
 
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
 
-    use test::Bencher;
-    use test::black_box;
     use super::*;
+    use test::black_box;
+    use test::Bencher;
 
     #[test]
     fn test_functional() {
-        let capture_width  = 200;
-        let capture_height  = 200;
+        let capture_width = 200;
+        let capture_height = 200;
         let iterations = 300;
         let scale = 3.5;
-        let image_buffer_test = generate_image_buffer(capture_width, capture_height, iterations, scale, 1.0);
+        let image_buffer_test =
+            generate_image_buffer(capture_width, capture_height, iterations, scale, 1.0);
 
         assert!(!image_buffer_test.is_empty());
         assert_eq!(image_buffer_test.dimensions().0, capture_height);
@@ -145,7 +151,7 @@ mod tests {
 
     #[bench]
     fn bench_tokio(b: &mut Bencher) {
-        b.iter(||{
+        b.iter(|| {
             let iterations = 300;
             let scale = 3.5;
             for (cw, ch) in vec![(100, 100), (200, 200), (300, 300)] {
@@ -153,5 +159,4 @@ mod tests {
             }
         });
     }
-
 }
