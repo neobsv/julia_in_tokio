@@ -5,11 +5,10 @@ use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
 use std::{
-    env,
-    sync::{Arc, Mutex},
+    env, sync::{Arc, Mutex}
 };
 use thread_priority::{set_current_thread_priority, ThreadPriority};
-use tokio::runtime;
+use tokio::{runtime, task::JoinHandle};
 
 async fn color_generator(
     z0: Complex<f64>,
@@ -50,47 +49,63 @@ fn generate_image_buffer(
     scale: f64,
     zoom: f64,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-    let wusize = width as usize;
-    let husize = height as usize;
-    let color_matrix = Arc::new(Mutex::new(vec![vec![Rgb([0, 0, 0]); wusize]; husize]));
 
-    let c = Complex::new(0.353343, 0.5133225);
-    let (w, h) = (width as f64, height as f64);
-    let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
+    let runtime_workers = runtime::Builder::new_multi_thread()
+    .enable_all()
+    .worker_threads(1)
+    // Lower OS priority of worker threads to prioritize main runtime
+    .on_thread_start(move || {
+        let _ = set_current_thread_priority(ThreadPriority::Min).is_ok();
+    })
+    .event_interval(200)
+    .build()
+    .unwrap();
 
-    let runtime = runtime::Builder::new_multi_thread()
-        .enable_all()
-        .worker_threads(1)
-        // Lower OS priority of worker threads to prioritize main runtime
-        .on_thread_start(move || {
-            let _ = set_current_thread_priority(ThreadPriority::Min).is_ok();
-        })
-        .event_interval(200)
-        .build()
-        .unwrap();
 
-    for x in 0..width as usize {
-        for y in 0..height as usize {
-            let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
-            let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
-            let z = Complex::new(cx, cy);
-            let color_matrix = Arc::clone(&color_matrix);
-            runtime.spawn(async move {
-                color_generator(z, c, iterations, x, y, color_matrix).await;
-            });
+    let image_buffer = runtime_workers.block_on(async {
+
+        let wusize = width as usize;
+        let husize = height as usize;
+        let color_matrix = Arc::new(Mutex::new(vec![vec![Rgb([0, 0, 0]); wusize]; husize]));
+
+        let c = Complex::new(0.353343, 0.5133225);
+        let (w, h) = (width as f64, height as f64);
+        let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
+
+
+
+
+        let mut tasks: Vec<JoinHandle<_>> = Vec::new();
+
+        for x in 0..width as usize {
+            for y in 0..height as usize {
+                let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
+                let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
+                let z = Complex::new(cx, cy);
+                let color_matrix = Arc::clone(&color_matrix);
+                tasks.push(runtime_workers.spawn(async move {
+                    color_generator(z, c, iterations, x, y, color_matrix).await;
+                }));
+            }
         }
-    }
 
-    let mut image_buffer = ImageBuffer::new(width, height);
-    let matrix = color_matrix.lock().unwrap();
+        let _o = futures::future::join_all(tasks.into_iter());
 
-    for x in 0..wusize {
-        for y in 0..husize {
-            image_buffer.put_pixel(x as u32, y as u32, matrix[x][y]);
+        // runtime_workers.shutdown_timeout(Duration::from_millis(100));
+
+        let mut image_buffer = ImageBuffer::new(width, height);
+        let matrix = color_matrix.lock().unwrap();
+        for x in 0..wusize {
+            for y in 0..husize {
+                image_buffer.put_pixel(x as u32, y as u32, matrix[x][y]);
+            }
         }
-    }
+
+        image_buffer
+    });
 
     image_buffer
+    
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -127,6 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
 
 #[cfg(test)]
 mod tests {
