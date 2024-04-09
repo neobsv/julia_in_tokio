@@ -14,11 +14,8 @@ use std::{
 fn color_generator(
     z0: Complex<f64>,
     c: Complex<f64>,
-    iterations: u32,
-    x: usize,
-    y: usize,
-    color_matrix: Arc<Mutex<Vec<Vec<Rgb<u8>>>>>,
-) -> () {
+    iterations: u32
+) -> Rgb<u8> {
     let mut z = z0;
     let mut current = 0;
 
@@ -39,8 +36,8 @@ fn color_generator(
         ]),
     };
 
-    let mut matrix = color_matrix.lock().unwrap();
-    matrix[x][y] = color;
+    color
+
 }
 
 fn generate_image_buffer(
@@ -67,13 +64,15 @@ fn generate_image_buffer(
             let z = Complex::new(cx, cy);
             let color_matrix = Arc::clone(&color_matrix);
             thread_vec.push(thread::spawn(move || {
-                color_generator(z, c, iterations, x, y, color_matrix);
+                let color = color_generator(z, c, iterations);
+                let mut matrix = color_matrix.lock().unwrap();
+                matrix[x][y] = color;
             }));
         }
     }
 
     for handle in thread_vec {
-        handle.join().unwrap();
+        let _ = handle.join();
     }
 
     let mut image_buffer = ImageBuffer::new(width, height);
@@ -145,12 +144,12 @@ mod tests {
     }
 
     #[bench]
-    fn bench_generate_image(b: &mut Bencher) {
+    fn bench_std_two(b: &mut Bencher) {
         b.iter(||{
             let iterations = 300;
             let scale = 3.5;
-            for (cw, ch) in vec![(10, 10), (20, 20), (30, 30)] {
-                let _ = black_box(generate_image_buffer(black_box(cw), black_box(ch), iterations, scale, 1.0));
+            for (cw, ch) in vec![(100, 100), (20, 20), (30, 30)] {
+                let _ = black_box(generate_image_buffer(cw, ch, iterations, scale, 1.0));
             }
         });
     }
