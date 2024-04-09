@@ -147,7 +147,7 @@ mod tests {
         b.iter(||{
             let iterations = 300;
             let scale = 3.5;
-            for (cw, ch) in vec![(10, 10), (20, 20), (30, 30)] {
+            for (cw, ch) in vec![(100, 100), (20, 20), (30, 30)] {
                 let _ = black_box(generate_image_buffer(cw, ch, iterations, scale, 1.0));
             }
         });
