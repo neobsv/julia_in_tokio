@@ -14,11 +14,8 @@ use tokio::{runtime, task::JoinHandle};
 async fn color_generator(
     z0: Complex<f64>,
     c: Complex<f64>,
-    iterations: u32,
-    x: usize,
-    y: usize,
-    color_matrix: Arc<Mutex<Vec<Vec<Rgb<u8>>>>>,
-) -> () {
+    iterations: u32
+) -> Rgb<u8> {
     let mut z = z0;
     let mut current = 0;
 
@@ -39,8 +36,7 @@ async fn color_generator(
         ]),
     };
 
-    let mut matrix = color_matrix.lock().unwrap();
-    matrix[x][y] = color;
+    color
 }
 
 fn generate_image_buffer(
@@ -79,7 +75,9 @@ fn generate_image_buffer(
                 let z = Complex::new(cx, cy);
                 let color_matrix = Arc::clone(&color_matrix);
                 tasks.push(runtime_workers.spawn(async move {
-                    color_generator(z, c, iterations, x, y, color_matrix).await;
+                    let color = color_generator(z, c, iterations).await;
+                    let mut matrix = color_matrix.lock().unwrap();
+                    matrix[x][y] = color;
                 }));
             }
         }
