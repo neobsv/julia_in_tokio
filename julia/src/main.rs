@@ -9,6 +9,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use crossbeam::thread;
+
 fn color_generator(
     z0: Complex<f64>,
     c: Complex<f64>,
@@ -53,14 +55,14 @@ fn generate_image_buffer(
     let (w, h) = (width as f64, height as f64);
     let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
-    let _ = crossbeam::scope(|tspawn| {
+    let _ = thread::scope(|scope| {
         for x in 0..wusize {
             for y in 0..husize {
                 let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
                 let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
                 let z = Complex::new(cx, cy);
                 let color_matrix = Arc::clone(&color_matrix);
-                tspawn.spawn(move |_| {
+                scope.spawn(move |_| {
                     let color = color_generator(z, c, iterations);
                     let mut matrix = color_matrix.lock().unwrap();
                     matrix[x][y] = color;
