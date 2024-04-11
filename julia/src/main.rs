@@ -56,7 +56,7 @@ fn generate_image_buffer(
     let (w, h) = (width as f64, height as f64);
     let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
-    let mut tasks: Vec<Task<_>>  = Vec::new();
+    let mut task_count: usize = 0;
 
     for x in 0..width as usize {
         for y in 0..height as usize {
@@ -64,15 +64,16 @@ fn generate_image_buffer(
             let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
             let z = Complex::new(cx, cy);
             let color_matrix = Arc::clone(&color_matrix);
-            tasks.push(ex.spawn(async move {
+            let _ = ex.spawn(async move {
                 let color = color_generator(z, c, iterations).await;
                 let mut matrix = color_matrix.lock().unwrap();
                 matrix[x][y] = color;
-            }));
+            });
+            task_count += 1;
         }
     }
 
-    for _ in tasks {
+    for _ in 0..task_count {
         future::block_on( ex.tick());
     }
 
