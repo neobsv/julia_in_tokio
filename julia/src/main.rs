@@ -50,7 +50,6 @@ fn generate_image_buffer(
         .enable_all()
         .worker_threads(10)
         .thread_stack_size(4 * 1024 * 1024)
-        // Lower OS priority of worker threads to prioritize main runtime
         .on_thread_start(move || {
             let _ = set_current_thread_priority(ThreadPriority::Min).is_ok();
         })
