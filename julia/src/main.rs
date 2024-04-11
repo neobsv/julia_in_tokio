@@ -8,7 +8,7 @@ use std::{
     env,
     sync::{Arc, Mutex}
 };
-use smol::Task;
+use smol::{future, Task};
 
 async fn color_generator(
     z0: Complex<f64>,
@@ -55,7 +55,7 @@ fn generate_image_buffer(
         let (w, h) = (width as f64, height as f64);
         let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
-        let mut tasks: Vec<Task<_>> = Vec::new();
+        let mut tasks: Vec<Task<_>>  = Vec::new();
 
         for x in 0..width as usize {
             for y in 0..height as usize {
@@ -71,7 +71,9 @@ fn generate_image_buffer(
             }
         }
 
-        let _o = futures::future::join_all(tasks.into_iter());
+        for handle in tasks {
+            let _ = future::block_on(handle);
+        }
 
         let mut image_buffer = ImageBuffer::new(width, height);
         let matrix = color_matrix.lock().unwrap();
