@@ -50,8 +50,8 @@ fn generate_image_buffer(
     let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
     let pool = rayon::ThreadPoolBuilder::new()
-        .stack_size(4 * 1024 * 1024)
-        .num_threads(1)
+        .stack_size(15 * 1024 * 1024)
+        .num_threads(5)
         .build()
         .unwrap();
 
