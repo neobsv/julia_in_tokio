@@ -146,7 +146,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_tokio_custom(b: &mut Bencher) {
+    fn bench_smol(b: &mut Bencher) {
         b.iter(|| {
             let iterations = 300;
             let scale = 3.5;
