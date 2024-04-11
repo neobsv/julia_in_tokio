@@ -7,8 +7,7 @@ edition = "2021"
 
 [dependencies]
 futures = "0.3"
-tokio = { version = "1", features = ["full"] }
-thread-priority = "0.16.0"
+smol = "2.0.0"
 num-complex = "0.4.4"
 image = "0.23.14"
 itertools = "0.9.0"
