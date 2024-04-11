@@ -8,7 +8,7 @@ use std::{
     env,
     sync::{Arc, Mutex}
 };
-use smol::{future, Task};
+use smol::{future, Executor, Task};
 
 async fn color_generator(
     z0: Complex<f64>,
@@ -46,47 +46,46 @@ fn generate_image_buffer(
     zoom: f64,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
 
-    let image_buffer = smol::block_on(async {
-        let wusize = width as usize;
-        let husize = height as usize;
-        let color_matrix = Arc::new(Mutex::new(vec![vec![Rgb([0, 0, 0]); wusize]; husize]));
+    let ex = Executor::new();
 
-        let c = Complex::new(0.353343, 0.5133225);
-        let (w, h) = (width as f64, height as f64);
-        let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
+    let wusize = width as usize;
+    let husize = height as usize;
+    let color_matrix = Arc::new(Mutex::new(vec![vec![Rgb([0, 0, 0]); wusize]; husize]));
 
-        let mut tasks: Vec<Task<_>>  = Vec::new();
+    let c = Complex::new(0.353343, 0.5133225);
+    let (w, h) = (width as f64, height as f64);
+    let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
-        for x in 0..width as usize {
-            for y in 0..height as usize {
-                let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
-                let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
-                let z = Complex::new(cx, cy);
-                let color_matrix = Arc::clone(&color_matrix);
-                tasks.push(smol::spawn(async move {
-                    let color = color_generator(z, c, iterations).await;
-                    let mut matrix = color_matrix.lock().unwrap();
-                    matrix[x][y] = color;
-                }));
-            }
+    let mut tasks: Vec<Task<_>>  = Vec::new();
+
+    for x in 0..width as usize {
+        for y in 0..height as usize {
+            let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
+            let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
+            let z = Complex::new(cx, cy);
+            let color_matrix = Arc::clone(&color_matrix);
+            tasks.push(ex.spawn(async move {
+                let color = color_generator(z, c, iterations).await;
+                let mut matrix = color_matrix.lock().unwrap();
+                matrix[x][y] = color;
+            }));
         }
+    }
 
-        for handle in tasks {
-            let _ = future::block_on(handle);
+    for _ in tasks {
+        future::block_on( ex.tick());
+    }
+
+    let mut image_buffer = ImageBuffer::new(width, height);
+    let matrix = color_matrix.lock().unwrap();
+    for x in 0..wusize {
+        for y in 0..husize {
+            image_buffer.put_pixel(x as u32, y as u32, matrix[x][y]);
         }
-
-        let mut image_buffer = ImageBuffer::new(width, height);
-        let matrix = color_matrix.lock().unwrap();
-        for x in 0..wusize {
-            for y in 0..husize {
-                image_buffer.put_pixel(x as u32, y as u32, matrix[x][y]);
-            }
-        }
-
-        image_buffer
-    });
+    }
 
     image_buffer
+
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
