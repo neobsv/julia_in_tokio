@@ -8,7 +8,7 @@ use std::{
     env,
     sync::{Arc, Mutex}
 };
-use smol::{future, Executor, Task};
+use smol::{future, Executor};
 
 async fn color_generator(
     z0: Complex<f64>,
@@ -146,7 +146,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_tokio_custom(b: &mut Bencher) {
+    fn bench_smol_executor(b: &mut Bencher) {
         b.iter(|| {
             let iterations = 300;
             let scale = 3.5;
