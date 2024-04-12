@@ -4,7 +4,8 @@ extern crate test;
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
-use std::{env, sync::{Arc, RwLock}};
+use std::{env, sync::{atomic::AtomicU8, Arc, RwLock}};
+use atomic::{Atomic, Ordering::Relaxed};
 
 fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> (u8, u8, u8) {
     let mut z = z0;
@@ -30,6 +31,24 @@ fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> (u8, u
     color
 }
 
+
+struct AtomicTuple {
+    one: AtomicU8,
+    two: AtomicU8,
+    three: AtomicU8
+}
+
+impl Clone for AtomicTuple {
+    fn clone(&self) -> Self {
+        AtomicTuple{
+            one: AtomicU8::new(self.one.load(Relaxed)),
+            two: AtomicU8::new(self.two.load(Relaxed)),
+            three: AtomicU8::new(self.three.load(Relaxed))
+        }
+    }
+}
+
+
 fn generate_image_buffer(
     width: u32,
     height: u32,
@@ -40,7 +59,7 @@ fn generate_image_buffer(
     let wusize = width as usize;
     let husize = height as usize;
 
-    let color_matrix = Arc::new(RwLock::new(vec![vec![(0, 0, 0); wusize]; husize]));
+    let color_matrix = Arc::new(vec![vec![ AtomicTuple{ one: AtomicU8::new(0), two: AtomicU8::new(0), three: AtomicU8::new(0) } ; wusize]; husize]);
 
     let c = Complex::new(0.353343, 0.5133225);
     let (w, h) = (width as f64, height as f64);
@@ -61,21 +80,19 @@ fn generate_image_buffer(
                 let color_matrix = Arc::clone(&color_matrix);
                 s.spawn(move |_| {
                     let color = color_generator(z, c, iterations);
-                    let mut matrix = color_matrix.write().unwrap();
-                    matrix[x][y].0 = color.0;
-                    matrix[x][y].1 = color.1;
-                    matrix[x][y].2 = color.2;
+                    color_matrix[x][y].one.store(color.0, Relaxed);
+                    color_matrix[x][y].two.store(color.1, Relaxed);
+                    color_matrix[x][y].three.store(color.2, Relaxed);
                 });
             }
         }
     });
 
     let mut image_buffer = ImageBuffer::new(width, height);
-    let matrix = color_matrix.read().unwrap().clone();
 
     for x in 0..wusize {
         for y in 0..husize {
-            image_buffer.put_pixel(x as u32, y as u32, Rgb([matrix[x][y].0, matrix[x][y].1, matrix[x][y].2]));
+            image_buffer.put_pixel(x as u32, y as u32, Rgb([color_matrix[x][y].one.load(Relaxed), color_matrix[x][y].two.load(Relaxed), color_matrix[x][y].three.load(Relaxed)]));
         }
     }
 
