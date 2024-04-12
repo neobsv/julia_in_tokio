@@ -46,11 +46,7 @@ fn generate_image_buffer(
     let (w, h) = (width as f64, height as f64);
     let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
-    let pool = rayon::ThreadPoolBuilder::new()
-        .stack_size(15 * 1024 * 1024)
-        .num_threads(1)
-        .build()
-        .unwrap();
+    let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
 
     pool.scope(|s| {
         for x in 0..width as usize {
