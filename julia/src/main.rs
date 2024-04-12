@@ -4,12 +4,9 @@ extern crate test;
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
-use std::{
-    cell::RefCell, 
-    env
-};
+use std::{env, sync::Arc};
 
-fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> Rgb<u8> {
+fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> (u8, u8, u8) {
     let mut z = z0;
     let mut current = 0;
 
@@ -22,12 +19,12 @@ fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> Rgb<u8
     let iterations = iterations as f64;
 
     let color = match current == iterations {
-        true => Rgb([0, 0, 0]),
-        false => Rgb([
+        true => (0, 0, 0),
+        false => (
             ((current / iterations).powf(0.2) * 255.0) as u8,
             ((current / iterations).powf(0.4) * 255.0) as u8,
-            (1.0 - (current / iterations).powf(0.9) * 255.0) as u8,
-        ]),
+            (1.0 - (current / iterations).powf(0.9) * 255.0) as u8
+        )
     };
 
     color
@@ -43,7 +40,7 @@ fn generate_image_buffer(
     let wusize = width as usize;
     let husize = height as usize;
 
-    let mut color_matrix = RefCell::new(vec![vec![Rgb([0, 0, 0]); wusize]; husize]);
+    let mut color_matrix: Arc<Vec<Vec<_>>> = Arc::new(vec![vec![(0, 0, 0); wusize]; husize]);
 
     let c = Complex::new(0.353343, 0.5133225);
     let (w, h) = (width as f64, height as f64);
@@ -61,21 +58,23 @@ fn generate_image_buffer(
                 let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
                 let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
                 let z = Complex::new(cx, cy);
-                let color_matrix = RefCell::clone(&mut color_matrix);
+                let color_matrix = Arc::clone(&color_matrix);
                 s.spawn(move |_| {
                     let color = color_generator(z, c, iterations);
-                    color_matrix.into_inner()[x][y] = color;
+                    // dbg!("color: ", color);
+                    // let mut row_pixels = color_matrix.get_mut(x * wusize).unwrap();
+                    // row_pixels[y] = (color.0, color.1, color.2);
                 });
             }
         }
     });
 
     let mut image_buffer = ImageBuffer::new(width, height);
-    let matrix = color_matrix.into_inner();
 
     for x in 0..wusize {
         for y in 0..husize {
-            image_buffer.put_pixel(x as u32, y as u32, matrix[x][y]);
+            
+            image_buffer.put_pixel(x as u32, y as u32, Rgb([color_matrix[x][y].0, color_matrix[x][y].1, color_matrix[x][y].2]));
         }
     }
 
