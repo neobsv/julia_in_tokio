@@ -4,7 +4,7 @@ extern crate test;
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
-use std::{env, sync::Arc};
+use std::{env, sync::{Arc, RwLock}};
 
 fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> (u8, u8, u8) {
     let mut z = z0;
@@ -40,7 +40,7 @@ fn generate_image_buffer(
     let wusize = width as usize;
     let husize = height as usize;
 
-    let mut color_matrix: Arc<Vec<Vec<_>>> = Arc::new(vec![vec![(0, 0, 0); wusize]; husize]);
+    let color_matrix = Arc::new(RwLock::new(vec![vec![(0, 0, 0); wusize]; husize]));
 
     let c = Complex::new(0.353343, 0.5133225);
     let (w, h) = (width as f64, height as f64);
@@ -48,7 +48,7 @@ fn generate_image_buffer(
 
     let pool = rayon::ThreadPoolBuilder::new()
         .stack_size(15 * 1024 * 1024)
-        .num_threads(10)
+        .num_threads(8)
         .build()
         .unwrap();
 
@@ -61,20 +61,21 @@ fn generate_image_buffer(
                 let color_matrix = Arc::clone(&color_matrix);
                 s.spawn(move |_| {
                     let color = color_generator(z, c, iterations);
-                    // dbg!("color: ", color);
-                    // let mut row_pixels = color_matrix.get_mut(x * wusize).unwrap();
-                    // row_pixels[y] = (color.0, color.1, color.2);
+                    let mut matrix = color_matrix.write().unwrap();
+                    matrix[x][y].0 = color.0;
+                    matrix[x][y].1 = color.1;
+                    matrix[x][y].2 = color.2;
                 });
             }
         }
     });
 
     let mut image_buffer = ImageBuffer::new(width, height);
+    let matrix = color_matrix.read().unwrap().clone();
 
     for x in 0..wusize {
         for y in 0..husize {
-            
-            image_buffer.put_pixel(x as u32, y as u32, Rgb([color_matrix[x][y].0, color_matrix[x][y].1, color_matrix[x][y].2]));
+            image_buffer.put_pixel(x as u32, y as u32, Rgb([matrix[x][y].0, matrix[x][y].1, matrix[x][y].2]));
         }
     }
 
@@ -82,6 +83,7 @@ fn generate_image_buffer(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 5 {
