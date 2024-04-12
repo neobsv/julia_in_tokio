@@ -5,8 +5,8 @@ use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
 use std::{
-    env,
-    sync::{Arc, Mutex},
+    cell::RefCell, 
+    env
 };
 
 fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> Rgb<u8> {
@@ -43,7 +43,7 @@ fn generate_image_buffer(
     let wusize = width as usize;
     let husize = height as usize;
 
-    let color_matrix = Arc::new(Mutex::new(vec![vec![Rgb([0, 0, 0]); wusize]; husize]));
+    let mut color_matrix = RefCell::new(vec![vec![Rgb([0, 0, 0]); wusize]; husize]);
 
     let c = Complex::new(0.353343, 0.5133225);
     let (w, h) = (width as f64, height as f64);
@@ -51,7 +51,7 @@ fn generate_image_buffer(
 
     let pool = rayon::ThreadPoolBuilder::new()
         .stack_size(15 * 1024 * 1024)
-        .num_threads(5)
+        .num_threads(10)
         .build()
         .unwrap();
 
@@ -61,18 +61,17 @@ fn generate_image_buffer(
                 let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
                 let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
                 let z = Complex::new(cx, cy);
-                let color_matrix = Arc::clone(&color_matrix);
+                let color_matrix = RefCell::clone(&mut color_matrix);
                 s.spawn(move |_| {
                     let color = color_generator(z, c, iterations);
-                    let mut matrix = color_matrix.lock().unwrap();
-                    matrix[x][y] = color;
+                    color_matrix.into_inner()[x][y] = color;
                 });
             }
         }
     });
 
     let mut image_buffer = ImageBuffer::new(width, height);
-    let matrix = color_matrix.lock().unwrap();
+    let matrix = color_matrix.into_inner();
 
     for x in 0..wusize {
         for y in 0..husize {
