@@ -8,7 +8,7 @@ use std::{
     env,
     sync::{Arc, Mutex}
 };
-use smol::{future, Task};
+use smol::Task;
 
 async fn color_generator(
     z0: Complex<f64>,
@@ -71,7 +71,7 @@ fn generate_image_buffer(
     }
 
     for handle in tasks {
-        let _ = future::block_on(handle);
+        let _ = smol::block_on(handle);
     }
 
     let mut image_buffer = ImageBuffer::new(width, height);
