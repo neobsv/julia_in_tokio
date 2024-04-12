@@ -4,8 +4,10 @@ extern crate test;
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
-use std::{env, sync::{atomic::AtomicU8, Arc}};
-use std::sync::atomic::Ordering::Relaxed;
+use rayon::iter::{ParallelBridge, ParallelIterator};
+use thread_priority::{set_current_thread_priority, ThreadPriority};
+use std::env;
+
 
 fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> (u8, u8, u8) {
     let mut z = z0;
@@ -32,23 +34,6 @@ fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> (u8, u
 }
 
 
-struct AtomicTuple {
-    one: AtomicU8,
-    two: AtomicU8,
-    three: AtomicU8
-}
-
-impl Clone for AtomicTuple {
-    fn clone(&self) -> Self {
-        AtomicTuple{
-            one: AtomicU8::new(self.one.load(Relaxed)),
-            two: AtomicU8::new(self.two.load(Relaxed)),
-            three: AtomicU8::new(self.three.load(Relaxed))
-        }
-    }
-}
-
-
 fn generate_image_buffer(
     width: u32,
     height: u32,
@@ -56,45 +41,32 @@ fn generate_image_buffer(
     scale: f64,
     zoom: f64,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-    let wusize = width as usize;
-    let husize = height as usize;
 
-    let color_matrix = Arc::new(vec![vec![ AtomicTuple{ one: AtomicU8::new(0), two: AtomicU8::new(0), three: AtomicU8::new(0) } ; wusize]; husize]);
+    let mut image_buffer = ImageBuffer::new(width, height);
 
     let c = Complex::new(0.353343, 0.5133225);
     let (w, h) = (width as f64, height as f64);
     let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
 
-    let pool = rayon::ThreadPoolBuilder::new()
-        .stack_size(15 * 1024 * 1024)
+    rayon::ThreadPoolBuilder::new()
         .num_threads(8)
-        .build()
+        .stack_size(4 * 1024 * 1024)
+        .start_handler(|_| {
+            let _ = set_current_thread_priority(ThreadPriority::Min).is_ok();
+        })
+        .build_global()
         .unwrap();
 
-    pool.scope(|s| {
-        for x in 0..width as usize {
-            for y in 0..height as usize {
-                let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
-                let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
-                let z = Complex::new(cx, cy);
-                let color_matrix = Arc::clone(&color_matrix);
-                s.spawn(move |_| {
-                    let color = color_generator(z, c, iterations);
-                    color_matrix[x][y].one.store(color.0, Relaxed);
-                    color_matrix[x][y].two.store(color.1, Relaxed);
-                    color_matrix[x][y].three.store(color.2, Relaxed);
-                });
-            }
-        }
+    let _ = image_buffer
+        .enumerate_pixels_mut()
+        .par_bridge()
+        .for_each(| (x, y, pixel)| {
+            let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
+            let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
+            let z = Complex::new(cx, cy);
+            let color = color_generator(z, c, iterations);
+            *pixel = Rgb([color.0, color.1, color.2]);
     });
-
-    let mut image_buffer = ImageBuffer::new(width, height);
-
-    for x in 0..wusize {
-        for y in 0..husize {
-            image_buffer.put_pixel(x as u32, y as u32, Rgb([color_matrix[x][y].one.load(Relaxed), color_matrix[x][y].two.load(Relaxed), color_matrix[x][y].three.load(Relaxed)]));
-        }
-    }
 
     image_buffer
 }
