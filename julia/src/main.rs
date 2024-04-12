@@ -4,8 +4,8 @@ extern crate test;
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
-use std::{env, sync::{atomic::AtomicU8, Arc, RwLock}};
-use atomic::{Atomic, Ordering::Relaxed};
+use std::{env, sync::{atomic::AtomicU8, Arc}};
+use std::sync::atomic::Ordering::Relaxed;
 
 fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> (u8, u8, u8) {
     let mut z = z0;
