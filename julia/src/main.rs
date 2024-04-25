@@ -8,7 +8,7 @@ use std::{
     env,
     sync::{Arc, Mutex}
 };
-use smol::Task;
+use smol::{future, Executor};
 
 async fn color_generator(
     z0: Complex<f64>,
@@ -46,6 +46,8 @@ fn generate_image_buffer(
     zoom: f64,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
 
+    let ex = Executor::new();
+
     let wusize = width as usize;
     let husize = height as usize;
     let color_matrix = Arc::new(Mutex::new(vec![vec![Rgb([0, 0, 0]); wusize]; husize]));
@@ -53,8 +55,8 @@ fn generate_image_buffer(
     let c = Complex::new(0.353343, 0.5133225);
     let (w, h) = (width as f64, height as f64);
     let (c_w, c_h) = ((w / zoom) as u32, (h / zoom) as u32);
-
-    let mut tasks: Vec<Task<_>>  = Vec::new();
+    
+    let mut tasks = vec![];
 
     for x in 0..width as usize {
         for y in 0..height as usize {
@@ -62,7 +64,7 @@ fn generate_image_buffer(
             let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
             let z = Complex::new(cx, cy);
             let color_matrix = Arc::clone(&color_matrix);
-            tasks.push(smol::spawn(async move {
+            tasks.push(ex.spawn(async move {
                 let color = color_generator(z, c, iterations).await;
                 let mut matrix = color_matrix.lock().unwrap();
                 matrix[x][y] = color;
@@ -70,8 +72,8 @@ fn generate_image_buffer(
         }
     }
 
-    for handle in tasks {
-        let _ = smol::block_on(handle);
+    for _ in tasks {
+        let _ = future::block_on(ex.tick());
     }
 
     let mut image_buffer = ImageBuffer::new(width, height);
