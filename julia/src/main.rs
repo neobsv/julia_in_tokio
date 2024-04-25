@@ -40,7 +40,7 @@ fn generate_image_buffer(
     let wusize = width as usize;
     let husize = height as usize;
 
-    let color_matrix = Arc::new(RwLock::new(vec![vec![(0, 0, 0); wusize]; husize]));
+    let color_matrix = Arc::new(RwLock::new(vec![vec![(0, 0, 0); husize]; wusize]));
 
     let c = Complex::new(0.353343, 0.5133225);
     let (w, h) = (width as f64, height as f64);
