@@ -10,11 +10,7 @@ use std::{
 };
 use tokio::task::JoinSet;
 
-async fn color_generator(
-    z0: Complex<f64>,
-    c: Complex<f64>,
-    iterations: u32
-) -> Rgb<u8> {
+async fn color_generator(z0: Complex<f64>, c: Complex<f64>, iterations: u32) -> Rgb<u8> {
     let mut z = z0;
     let mut current = 0;
 
@@ -36,7 +32,6 @@ async fn color_generator(
     };
 
     color
-
 }
 
 #[tokio::main]
@@ -49,7 +44,7 @@ async fn generate_image_buffer(
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
     let wusize = width as usize;
     let husize = height as usize;
-    let color_matrix = Arc::new(Mutex::new(vec![vec![Rgb([0, 0, 0]); wusize]; husize]));
+    let color_matrix = Arc::new(Mutex::new(vec![vec![Rgb([0, 0, 0]); husize]; wusize]));
 
     let c = Complex::new(0.353343, 0.5133225);
     let (w, h) = (width as f64, height as f64);
@@ -120,21 +115,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
 
-    use test::Bencher;
-    use test::black_box;
     use super::*;
+    use test::black_box;
+    use test::Bencher;
 
     #[test]
     fn test_functional() {
-        let capture_width  = 200;
-        let capture_height  = 200;
+        let capture_width = 200;
+        let capture_height = 200;
         let iterations = 300;
         let scale = 3.5;
-        let image_buffer_test = generate_image_buffer(capture_width, capture_height, iterations, scale, 1.0);
+        let image_buffer_test =
+            generate_image_buffer(capture_width, capture_height, iterations, scale, 1.0);
 
         assert!(!image_buffer_test.is_empty());
         assert_eq!(image_buffer_test.dimensions().0, capture_height);
@@ -143,7 +138,7 @@ mod tests {
 
     #[bench]
     fn bench_tokio(b: &mut Bencher) {
-        b.iter(||{
+        b.iter(|| {
             let iterations = 300;
             let scale = 3.5;
             for (cw, ch) in vec![(100, 100), (20, 20), (30, 30)] {
@@ -151,5 +146,4 @@ mod tests {
             }
         });
     }
-
 }
