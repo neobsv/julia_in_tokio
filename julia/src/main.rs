@@ -4,11 +4,11 @@ extern crate test;
 use image::{ImageBuffer, Rgb};
 use itertools::Itertools;
 use num_complex::Complex;
+use smol::{future, Executor};
 use std::{
     env,
     sync::{Arc, Mutex}
 };
-use smol::{future, Executor};
 
 async fn color_generator(
     z0: Complex<f64>,
@@ -50,7 +50,7 @@ fn generate_image_buffer(
 
     let wusize = width as usize;
     let husize = height as usize;
-    let color_matrix = Arc::new(Mutex::new(vec![vec![Rgb([0, 0, 0]); wusize]; husize]));
+    let color_matrix = Arc::new(Mutex::new(vec![vec![Rgb([0, 0, 0]); husize]; wusize]));
 
     let c = Complex::new(0.353343, 0.5133225);
     let (w, h) = (width as f64, height as f64);
@@ -58,8 +58,8 @@ fn generate_image_buffer(
     
     let mut tasks = vec![];
 
-    for x in 0..width as usize {
-        for y in 0..height as usize {
+    for x in 0..wusize {
+        for y in 0..husize {
             let cx = (x as f64 - 0.5 * c_w as f64) * scale / w;
             let cy = (y as f64 - 0.5 * c_h as f64) * scale / h;
             let z = Complex::new(cx, cy);
